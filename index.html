@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="金融分析的实力辅助 - 美股行情与分析工作台" />
+    <title>金融分析的实力辅助</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">F</div>
+          <div>
+            <strong>实力辅助</strong>
+            <span>美股分析工作台</span>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="主导航">
+          <a class="nav-item active" href="#overview"><span class="nav-icon">⌂</span>市场概览</a>
+          <a class="nav-item" href="#watchlist"><span class="nav-icon">☆</span>自选股票</a>
+          <a class="nav-item" href="#insights"><span class="nav-icon">✦</span>智能分析</a>
+          <a class="nav-item" href="#calendar"><span class="nav-icon">▦</span>财报日历</a>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="status-card">
+            <div class="status-dot"></div>
+            <div><strong>数据服务正常</strong><span>更新于 16:02 ET</span></div>
+          </div>
+          <a class="nav-item" href="#settings"><span class="nav-icon">⚙</span>设置</a>
+          <div class="profile"><div class="avatar">L</div><div><strong>Leo</strong><span>个人工作台</span></div><span class="more">···</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="overview">
+        <header class="topbar">
+          <div class="mobile-brand"><div class="brand-mark">F</div><strong>实力辅助</strong></div>
+          <label class="search-box"><span>⌕</span><input id="stock-search" type="search" placeholder="搜索股票、公司或代码" /><kbd>⌘ K</kbd></label>
+          <div class="top-actions"><button class="icon-button" aria-label="通知">♧<i></i></button><button class="help-button">?</button></div>
+        </header>
+
+        <div class="content-wrap">
+          <section class="welcome-row">
+            <div><p class="eyebrow">周二，2026 年 10 月 8 日</p><h1>早上好，Leo <span>👋</span></h1><p class="subtitle">这是今天的市场快照，保持专注，理性决策。</p></div>
+            <button class="primary-button" id="analysis-button"><span>✦</span> 开始智能分析</button>
+          </section>
+
+          <section class="market-grid" aria-label="主要指数">
+            <article class="market-card"><div class="card-head"><span>S&amp;P 500</span><span class="market-label green">● 开盘</span></div><div class="market-value">5,743.75</div><div class="market-change green">+0.42% <span>↗</span></div><svg class="sparkline green-line" viewBox="0 0 210 50" preserveAspectRatio="none"><path d="M0 40 C20 39,23 27,40 32 S62 20,78 25 S100 22,115 25 S130 9,147 18 S170 7,185 13 S199 5,210 4" /></svg></article>
+            <article class="market-card"><div class="card-head"><span>NASDAQ</span><span class="market-label green">● 开盘</span></div><div class="market-value">18,182.92</div><div class="market-change green">+0.76% <span>↗</span></div><svg class="sparkline green-line" viewBox="0 0 210 50" preserveAspectRatio="none"><path d="M0 38 C22 42,29 26,45 31 S67 17,82 28 S109 20,122 22 S136 4,149 14 S169 15,183 7 S198 10,210 2" /></svg></article>
+            <article class="market-card"><div class="card-head"><span>DOW JONES</span><span class="market-label red">● 开盘</span></div><div class="market-value">42,080.37</div><div class="market-change red">−0.18% <span>↘</span></div><svg class="sparkline red-line" viewBox="0 0 210 50" preserveAspectRatio="none"><path d="M0 12 C20 8,30 24,45 20 S65 28,82 22 S100 34,115 27 S140 31,151 26 S170 42,185 34 S198 38,210 44" /></svg></article>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="panel watchlist-panel" id="watchlist">
+              <div class="panel-heading"><div><h2>我的自选</h2><p>你关注的股票动态</p></div><button class="text-button" id="add-stock">＋ 添加股票</button></div>
+              <div class="watchlist-head"><span>股票</span><span>最新价</span><span>涨跌幅</span><span>趋势</span></div>
+              <div id="watchlist-rows"></div>
+              <button class="view-all" id="view-all">查看全部自选 <span>→</span></button>
+            </article>
+
+            <article class="panel insight-panel" id="insights">
+              <div class="panel-heading"><div><h2>今日洞察</h2><p>基于市场数据的智能摘要</p></div><span class="spark-badge">✦ AI</span></div>
+              <div class="insight-main"><div class="insight-icon">✦</div><div><strong>科技板块保持强势</strong><p>AI 基础设施和云计算板块今日领涨，资金持续流入大型科技股。</p></div></div>
+              <div class="insight-list"><div><span class="tiny-dot green-bg"></span><span>市场情绪</span><strong>偏乐观</strong></div><div><span class="tiny-dot blue-bg"></span><span>热门主题</span><strong>AI 基础设施</strong></div><div><span class="tiny-dot amber-bg"></span><span>风险提示</span><strong>估值偏高</strong></div></div>
+              <button class="outline-button" id="full-report">查看完整分析报告 <span>→</span></button>
+            </article>
+          </section>
+
+          <section class="lower-grid" id="calendar">
+            <article class="panel calendar-panel"><div class="panel-heading"><div><h2>财报日历</h2><p>未来 7 天重要财报</p></div><button class="dots">···</button></div><div class="earnings-row"><div class="date-box"><strong>09</strong><span>OCT</span></div><div class="company"><strong>台积电 <small>TSM</small></strong><span>盘前 · 预计 EPS $1.79</span></div><span class="estimate">$1.79</span></div><div class="earnings-row"><div class="date-box"><strong>10</strong><span>OCT</span></div><div class="company"><strong>达美航空 <small>DAL</small></strong><span>盘前 · 预计 EPS $1.50</span></div><span class="estimate">$1.50</span></div><div class="earnings-row"><div class="date-box"><strong>14</strong><span>OCT</span></div><div class="company"><strong>美国银行 <small>BAC</small></strong><span>盘前 · 预计 EPS $0.92</span></div><span class="estimate">$0.92</span></div></article>
+            <article class="panel note-panel"><div class="panel-heading"><div><h2>分析备忘</h2><p>记录你的投资想法</p></div><button class="add-note" id="add-note">＋</button></div><textarea id="note" placeholder="写下今天的观察...">关注 AI 基础设施板块的回调机会。</textarea><div class="note-footer"><span id="save-state">自动保存</span><button class="save-button" id="save-note">保存备忘</button></div></article>
+          </section>
+
+          <footer><span>金融分析的实力辅助 · 数据仅供学习参考</span><span>美股市场数据 · 延迟 15 分钟</span></footer>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
