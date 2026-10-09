@@ -1,0 +1,15 @@
+{
+  "folders": [
+    { "path": "." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/node_modules": true,
+      "**/.venv": true,
+      "static": true,
+      "logs": true,
+      "data": true
+    }
+  }
+}
