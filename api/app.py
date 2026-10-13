@@ -155,7 +155,7 @@ def _missing_asset_media_type(asset_path: str) -> str:
 
 
 def _warn_if_open_cors_without_auth() -> None:
-    if is_auth_enabled():
+    if is_auth_enabled() or web_accounts.enabled():
         return
     logger.warning(
         "CORS_ALLOW_ALL=true is enabled while ADMIN_AUTH_ENABLED is false. "
@@ -168,6 +168,7 @@ from api.middlewares.auth import add_auth_middleware
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.schemas.common import HealthResponse
 from src.auth import is_auth_enabled
+from src import web_accounts
 from src.data.stock_index_loader import find_existing_stock_index_path
 from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import (
@@ -178,6 +179,7 @@ from src.services.runtime_scheduler import (
     RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
     RuntimeSchedulerService,
 )
+from src.services.web_scheduled_push import WebScheduledPushWorker
 from src.services.stock_index_remote_service import (
     get_remote_stock_index_cache_path,
     refresh_remote_stock_index_cache,
@@ -288,6 +290,10 @@ async def app_lifespan(app: FastAPI):
     app.state.system_config_service = SystemConfigService(
         runtime_scheduler=app.state.runtime_scheduler_service,
     )
+    web_push_worker = WebScheduledPushWorker()
+    app.state.web_scheduled_push_worker = web_push_worker
+    if web_accounts.enabled():
+        web_push_worker.start()
     _schedule_stock_index_background_refresh(app, "startup")
     # 名称解析器的 AkShare 缓存预热：命中磁盘缓存则零网络加载，否则发起
     # 后台单飞拉取。把冷启动等待从首个用户请求挪到进程启动窗口。
@@ -308,6 +314,10 @@ async def app_lifespan(app: FastAPI):
         if runtime_scheduler is not None:
             runtime_scheduler.stop()
             delattr(app.state, "runtime_scheduler_service")
+        web_push_worker = getattr(app.state, "web_scheduled_push_worker", None)
+        if web_push_worker is not None:
+            web_push_worker.stop()
+            delattr(app.state, "web_scheduled_push_worker")
 
 
 def create_app(static_dir: Optional[Path] = None) -> FastAPI:
@@ -338,6 +348,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
             "## 认证方式\n"
             "支持可选管理员认证：ADMIN_AUTH_ENABLED=true 时，除登录、状态、健康检查和 "
             "OpenAPI 文档外，/api/v1/* 需要有效管理员会话 Cookie；关闭时不强制认证。"
+            "可选 WEB_ACCOUNTS_ENABLED=true 开启用户名密码账号模式；普通账号进入同一工作台，系统密钥与全局设置仅管理员可见。"
         ),
         version="1.0.0",
         lifespan=app_lifespan,

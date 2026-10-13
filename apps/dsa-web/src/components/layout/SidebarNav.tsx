@@ -9,8 +9,6 @@ import type { UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { StatusDot } from '../common/StatusDot';
-import { UiLanguageToggle } from '../i18n/UiLanguageToggle';
-import { ThemeToggle } from '../theme/ThemeToggle';
 
 type SidebarNavProps = {
   collapsed?: boolean;
@@ -76,12 +74,12 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   const navItems = showScreeningNav ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.key !== 'screening');
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
-    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-2xl border border-transparent text-sm leading-none text-secondary-text transition-all',
+    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-md border border-transparent text-[13px] leading-none text-secondary-text transition-colors',
     isRail
       ? 'justify-center gap-2.5 px-2'
       : collapsed
         ? 'justify-center px-0'
-        : 'gap-3 px-[var(--nav-item-padding-x)]'
+          : 'gap-3 px-[var(--nav-item-padding-x)]'
   );
   const itemInteractiveClass = cn(
     itemBaseClass,
@@ -92,28 +90,31 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   const itemLabelClass = cn('truncate', isRail ? 'text-center' : '');
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div
         className={cn(
           'flex items-center',
-          isRail ? 'mb-5 justify-center gap-2 pt-1' : 'mb-4 gap-2 px-1',
+          isRail ? 'mb-5 justify-center gap-2 pt-1' : 'mb-7 gap-2.5 px-2',
           collapsed || isRail ? 'justify-center' : ''
         )}
       >
         <div
           className={cn(
-            'flex items-center justify-center bg-primary-gradient text-[hsl(var(--primary-foreground))] shadow-[0_12px_28px_var(--nav-brand-shadow)]',
-            isRail ? 'h-9 w-9 rounded-[1rem]' : 'h-10 w-10 rounded-2xl'
+            'flex items-center justify-center bg-[#172033] text-white',
+            isRail ? 'h-9 w-9 rounded-md' : 'h-9 w-9 rounded-md'
           )}
         >
           <BarChart3 className={cn(isRail ? 'h-[19px] w-[19px]' : 'h-5 w-5')} />
         </div>
         {!collapsed ? (
-          <p className={cn('min-w-0 truncate font-semibold text-foreground', isRail ? 'text-[0.95rem] leading-none' : 'text-sm')}>DSA</p>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-semibold text-foreground">金融分析的实力辅助</p>
+            <p className="truncate text-[10px] text-muted-text">美股分析工作台</p>
+          </div>
         ) : null}
       </div>
 
-      <nav className={cn('flex flex-col gap-1.5', isRail ? '' : 'flex-1')} aria-label={t('layout.mainNav')}>
+      <nav className={cn('finance-nav flex min-h-0 flex-col gap-1 overflow-y-auto', isRail ? '' : 'flex-1')} aria-label={t('layout.mainNav')}>
         {navItems.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
           return (
@@ -151,24 +152,6 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         );
         })}
 
-        <ThemeToggle
-          variant={isRail ? 'rail' : 'nav'}
-          collapsed={collapsed}
-          wrapperClassName="w-full"
-          triggerClassName={itemInteractiveClass}
-          triggerActiveClassName={itemActiveClass}
-          iconClassName={itemIconClass}
-          labelClassName={itemLabelClass}
-        />
-        <UiLanguageToggle
-          variant={isRail ? 'rail' : 'nav'}
-          collapsed={collapsed}
-          wrapperClassName="w-full"
-          triggerClassName={itemInteractiveClass}
-          triggerActiveClassName={itemActiveClass}
-          iconClassName={itemIconClass}
-          labelClassName={itemLabelClass}
-        />
       </nav>
 
       {authEnabled ? (

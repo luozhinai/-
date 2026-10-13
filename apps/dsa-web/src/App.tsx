@@ -13,6 +13,7 @@ import { useAgentChatStore } from './stores/agentChatStore';
 import './App.css';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
+const PersonalSettingsPage = lazy(() => import('./pages/PersonalSettingsPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -26,7 +27,7 @@ const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 
 const AppContent: React.FC = () => {
   const location = useLocation();
-  const { authEnabled, loggedIn, isLoading, loadError, refreshStatus } = useAuth();
+  const { authEnabled, loggedIn, accountMode, user, isLoading, loadError, refreshStatus } = useAuth();
   const { t } = useUiLanguage();
 
   useEffect(() => {
@@ -87,7 +88,7 @@ const AppContent: React.FC = () => {
         <Route path="/backtest" element={<BacktestPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/usage" element={<TokenUsagePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings" element={accountMode && user?.role === 'user' ? <PersonalSettingsPage /> : <SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

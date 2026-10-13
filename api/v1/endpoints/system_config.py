@@ -35,6 +35,7 @@ from api.v1.schemas.system_config import (
     ValidateSystemConfigResponse,
 )
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
+from src import web_accounts
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigImportError,
@@ -97,6 +98,12 @@ def _allow_env_backup_access(request: Request) -> None:
     - Desktop runtime keeps existing local behavior via DSA_DESKTOP_MODE.
     - Non-desktop runtime must have admin auth enabled and a valid session.
     """
+    if web_accounts.enabled():
+        identity = web_accounts.verify_session(request.cookies.get(web_accounts.COOKIE_NAME))
+        if identity is not None and identity.role == "admin":
+            return
+        raise EnvBackupAccessDenied(status_code=403, message="Only the administrator can manage system configuration backups")
+
     if os.getenv("DSA_DESKTOP_MODE") == "true":
         return
 

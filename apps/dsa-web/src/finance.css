@@ -1,0 +1,122 @@
+.finance-shell {
+  --finance-line: #e7ebf1;
+  background: #f7f9fc;
+}
+
+.finance-shell .finance-sidebar {
+  background: #fff;
+  border-color: var(--finance-line);
+}
+
+.finance-shell .finance-header {
+  box-shadow: 0 1px 0 rgb(23 32 51 / 3%);
+}
+
+.finance-shell .finance-main,
+.finance-shell .finance-home,
+.finance-home-toolbar {
+  background: #f7f9fc;
+}
+
+.finance-shell .finance-nav a {
+  border-radius: 7px;
+}
+
+.finance-shell .finance-nav a:hover {
+  background: #f4f6fa;
+}
+
+.finance-shell .finance-nav a[aria-current="page"] {
+  background: #eaf2f4;
+  color: #17616c;
+  border-color: #d7e7e9;
+}
+
+.finance-home-report {
+  scrollbar-color: #cbd3e1 transparent;
+}
+
+.finance-shell :is(.terminal-card, .dashboard-card, .glass-card, .home-subpanel, .home-history-item, .home-report-hero, .home-rail-card) {
+  border-radius: 8px;
+  border-color: var(--finance-line);
+  background: #fff;
+  box-shadow: 0 5px 18px rgb(23 32 51 / 5%);
+  backdrop-filter: none;
+}
+
+.finance-shell :is(.terminal-card, .dashboard-card, .glass-card)::before,
+.finance-shell :is(.terminal-card, .dashboard-card, .glass-card)::after,
+.finance-shell :is(.home-report-hero, .home-rail-card)::after {
+  display: none;
+}
+
+.finance-shell .home-surface-button {
+  border-radius: 7px;
+  border-color: #dfe4ec;
+  background: #fff;
+  box-shadow: none;
+}
+
+.finance-shell .home-surface-button:hover {
+  border-color: #b9c6ee;
+  background: #f8faff;
+  box-shadow: none;
+}
+
+.finance-shell .btn-primary {
+  border-radius: 7px;
+  border-color: #172033;
+  background: #172033;
+  color: #fff;
+  box-shadow: 0 5px 12px rgb(23 32 51 / 12%);
+}
+
+.finance-shell .btn-primary:hover {
+  background: #2b3952;
+  box-shadow: 0 7px 16px rgb(23 32 51 / 16%);
+}
+
+.finance-shell .btn-secondary {
+  border-radius: 7px;
+  border-color: #dfe4ec;
+  background: #fff;
+  color: #566276;
+  box-shadow: none;
+}
+
+.finance-shell .btn-secondary:hover {
+  border-color: #b9c6ee;
+  background: #f8faff;
+}
+
+.finance-shell .home-history-item-selected {
+  border-color: #c9d4fb;
+  background: #f2f5ff;
+  box-shadow: inset 3px 0 0 #5677dc;
+}
+
+.finance-shell :is(.home-accent-chip, .home-accent-pill-link) {
+  border-radius: 5px;
+}
+
+.dark .finance-shell,
+.dark .finance-shell :is(.finance-main, .finance-home, .finance-home-toolbar) {
+  background: hsl(var(--background));
+}
+
+.dark .finance-shell :is(.finance-sidebar, .finance-header, .terminal-card, .dashboard-card, .glass-card, .home-subpanel, .home-history-item, .home-report-hero, .home-rail-card) {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+
+.dark .finance-shell :is(.btn-secondary, .home-surface-button) {
+  background: hsl(var(--elevated));
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+.dark .finance-shell .finance-nav a[aria-current="page"] {
+  background: #17343c;
+  color: #9ce3e4;
+  border-color: #27515b;
+}

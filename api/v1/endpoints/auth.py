@@ -33,6 +33,7 @@ from src.auth import (
 )
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
+from src import web_accounts
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,16 @@ class LoginRequest(BaseModel):
 
     password: str = Field(default="", description="Admin password")
     password_confirm: str | None = Field(default=None, alias="passwordConfirm", description="Confirm (first-time)")
+    username: str = Field(default="", description="Username in Web accounts mode")
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    password_confirm: str = Field(alias="passwordConfirm")
+    legacy_password: str = Field(default="", alias="legacyPassword")
+
+    model_config = {"populate_by_name": True}
 
 
 class ChangePasswordRequest(BaseModel):
@@ -156,6 +167,20 @@ def _set_session_cookie(response: Response, session_value: str, request: Request
 
 def _get_auth_status_dict(request: Request | None = None) -> dict:
     """Helper to build consistent auth status response body."""
+    if web_accounts.enabled():
+        identity = web_accounts.verify_session(request.cookies.get(web_accounts.COOKIE_NAME)) if request else None
+        admin_exists = web_accounts.has_admin()
+        return {
+            "authEnabled": True,
+            "loggedIn": identity is not None,
+            "passwordSet": admin_exists,
+            "passwordChangeable": False,
+            "setupState": "enabled",
+            "accountMode": True,
+            "adminExists": admin_exists,
+            "legacyPasswordRequired": has_stored_password() if not admin_exists else False,
+            "user": {"id": identity.id, "username": identity.username, "role": identity.role} if identity else None,
+        }
     auth_enabled = is_auth_enabled()
     logged_in = False
     if auth_enabled and request:
@@ -207,6 +232,8 @@ async def auth_status(request: Request):
 )
 async def auth_update_settings(request: Request, body: AuthSettingsRequest):
     """Manage auth enablement from the settings page."""
+    if web_accounts.enabled():
+        return JSONResponse(status_code=409, content={"error": "account_mode", "message": "账号模式下不能关闭登录保护"})
     target_enabled = body.auth_enabled
     current_enabled = is_auth_enabled()
     stored_password_exists = has_stored_password()
@@ -366,6 +393,19 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
 )
 async def auth_login(request: Request, body: LoginRequest):
     """Verify password or set initial password, set cookie on success. Returns 401 or 429 on failure."""
+    if web_accounts.enabled():
+        ip = get_client_ip(request)
+        if not check_rate_limit(ip):
+            return JSONResponse(status_code=429, content={"error": "rate_limited", "message": "尝试过多，请稍后重试"})
+        identity = web_accounts.authenticate(body.username, body.password)
+        if identity is None:
+            record_login_failure(ip)
+            return JSONResponse(status_code=401, content={"error": "invalid_credentials", "message": "用户名或密码错误"})
+        clear_rate_limit(ip)
+        response = JSONResponse(content={"ok": True})
+        response.set_cookie(web_accounts.COOKIE_NAME, web_accounts.create_session(identity), **_cookie_params(request))
+        return response
+
     if not is_auth_enabled():
         return JSONResponse(
             status_code=400,
@@ -435,6 +475,8 @@ async def auth_login(request: Request, body: LoginRequest):
 )
 async def auth_change_password(body: ChangePasswordRequest):
     """Change password. Requires login."""
+    if web_accounts.enabled():
+        return JSONResponse(status_code=409, content={"error": "account_mode", "message": "账号模式密码修改尚未开放"})
     if not is_password_changeable():
         return JSONResponse(
             status_code=400,
@@ -472,6 +514,13 @@ async def auth_change_password(body: ChangePasswordRequest):
 )
 async def auth_logout(request: Request):
     """Clear session cookie."""
+    if web_accounts.enabled():
+        identity = web_accounts.verify_session(request.cookies.get(web_accounts.COOKIE_NAME))
+        if identity:
+            web_accounts.revoke_sessions(identity.id)
+        resp = Response(status_code=204)
+        resp.delete_cookie(key=web_accounts.COOKIE_NAME, path="/")
+        return resp
     if is_auth_enabled() and not rotate_session_secret():
         return JSONResponse(
             status_code=500,
@@ -480,3 +529,38 @@ async def auth_logout(request: Request):
     resp = Response(status_code=204)
     resp.delete_cookie(key=COOKIE_NAME, path="/")
     return resp
+
+
+@router.post("/register", summary="Register a Web account")
+async def auth_register(request: Request, body: RegisterRequest):
+    if not web_accounts.enabled():
+        return JSONResponse(status_code=404, content={"error": "not_found", "message": "注册未启用"})
+    if body.password != body.password_confirm:
+        return JSONResponse(status_code=400, content={"error": "password_mismatch", "message": "两次密码不一致"})
+    ip = get_client_ip(request)
+    if not check_rate_limit(ip):
+        return JSONResponse(status_code=429, content={"error": "rate_limited", "message": "尝试过多，请稍后重试"})
+    first_admin = not web_accounts.has_admin()
+    if first_admin:
+        # Trust the direct connection only. X-Forwarded-For is not proof of
+        # localhost and must never be used for bootstrap authorization.
+        host = request.client.host if request.client else ""
+        # A reverse proxy commonly connects from loopback on behalf of a
+        # remote browser. Reject forwarded requests during bootstrap.
+        forwarded = any(
+            request.headers.get(name)
+            for name in ("forwarded", "x-forwarded-for", "x-real-ip", "x-forwarded-host")
+        )
+        if host not in {"127.0.0.1", "::1"} or forwarded:
+            return JSONResponse(status_code=403, content={"error": "local_only", "message": "请在服务器本机创建首个管理员"})
+        if has_stored_password() and not verify_stored_password(body.legacy_password):
+            record_login_failure(ip)
+            return JSONResponse(status_code=403, content={"error": "legacy_password_required", "message": "原管理员密码不正确"})
+    try:
+        identity = web_accounts.register(body.username, body.password, first_admin=first_admin)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": "invalid_registration", "message": str(exc)})
+    clear_rate_limit(ip)
+    response = JSONResponse(status_code=201, content={"ok": True, "role": identity.role})
+    response.set_cookie(web_accounts.COOKIE_NAME, web_accounts.create_session(identity), **_cookie_params(request))
+    return response

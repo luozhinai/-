@@ -10,9 +10,14 @@ type AuthContextValue = {
   passwordSet: boolean;
   passwordChangeable: boolean;
   setupState: 'enabled' | 'password_retained' | 'no_password';
+  accountMode: boolean;
+  adminExists: boolean;
+  legacyPasswordRequired: boolean;
+  user: { id: string; username: string; role: 'admin' | 'user' } | null;
   isLoading: boolean;
   loadError: ParsedApiError | null;
-  login: (password: string, passwordConfirm?: string) => Promise<{ success: boolean; error?: ParsedApiError }>;
+  login: (password: string, passwordConfirm?: string, username?: string) => Promise<{ success: boolean; error?: ParsedApiError }>;
+  register: (username: string, password: string, passwordConfirm: string, legacyPassword?: string) => Promise<{ success: boolean; error?: ParsedApiError }>;
   changePassword: (
     currentPassword: string,
     newPassword: string,
@@ -44,6 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [passwordSet, setPasswordSet] = useState(false);
   const [passwordChangeable, setPasswordChangeable] = useState(false);
   const [setupState, setSetupState] = useState<'enabled' | 'password_retained' | 'no_password'>('no_password');
+  const [accountMode, setAccountMode] = useState(false);
+  const [adminExists, setAdminExists] = useState(false);
+  const [legacyPasswordRequired, setLegacyPasswordRequired] = useState(false);
+  const [user, setUser] = useState<AuthContextValue['user']>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
 
@@ -57,6 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPasswordSet(status.passwordSet ?? false);
       setPasswordChangeable(status.passwordChangeable ?? false);
       setSetupState(status.setupState);
+      setAccountMode(status.accountMode ?? false);
+      setAdminExists(status.adminExists ?? false);
+      setLegacyPasswordRequired(status.legacyPasswordRequired ?? false);
+      setUser(status.user ?? null);
       if (status.authEnabled && !status.loggedIn) {
         useStockPoolStore.getState().resetDashboardState();
       }
@@ -67,6 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPasswordSet(false);
       setPasswordChangeable(false);
       setSetupState('no_password');
+      setAccountMode(false);
+      setAdminExists(false);
+      setLegacyPasswordRequired(false);
+      setUser(null);
       useStockPoolStore.getState().resetDashboardState();
     } finally {
       setIsLoading(false);
@@ -80,10 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (
       password: string,
-      passwordConfirm?: string
+      passwordConfirm?: string,
+      username?: string
     ): Promise<{ success: boolean; error?: ParsedApiError }> => {
       try {
-        await authApi.login(password, passwordConfirm);
+        await authApi.login(password, passwordConfirm, username);
         await fetchStatus();
         return { success: true };
       } catch (err: unknown) {
@@ -92,6 +110,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     [fetchStatus]
   );
+
+  const register = useCallback(async (username: string, password: string, passwordConfirm: string, legacyPassword?: string) => {
+    try {
+      await authApi.register(username, password, passwordConfirm, legacyPassword);
+      await fetchStatus();
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: extractLoginError(err) };
+    }
+  }, [fetchStatus]);
 
   const changePassword = useCallback(
     async (
@@ -132,9 +160,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         passwordSet,
         passwordChangeable,
         setupState,
+        accountMode,
+        adminExists,
+        legacyPasswordRequired,
+        user,
         isLoading,
         loadError,
         login,
+        register,
         changePassword,
         logout,
         refreshStatus: fetchStatus,

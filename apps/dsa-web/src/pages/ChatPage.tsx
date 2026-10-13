@@ -36,6 +36,7 @@ import {
 import { useStockIndex } from '../hooks/useStockIndex';
 import type { StockIndexItem } from '../types/stockIndex';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Quick question examples shown on empty state
 type ActiveStockContext = Pick<ChatFollowUpContext, 'stock_code' | 'stock_name'>;
@@ -243,6 +244,8 @@ const restoreActiveStockContextFromMessages = (
 
 const ChatPage: React.FC = () => {
   const { t } = useUiLanguage();
+  const { user } = useAuth();
+  const canEditGlobalConfig = user?.role !== 'user';
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [input, setInput] = useState('');
@@ -520,6 +523,10 @@ const ChatPage: React.FC = () => {
   }, [loadAgentStatus]);
 
   useEffect(() => {
+    if (!canEditGlobalConfig) {
+      setContextCompressionLoaded(false);
+      return undefined;
+    }
     let active = true;
 
     void systemConfigApi.getConfig(false)
@@ -547,7 +554,7 @@ const ChatPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [canEditGlobalConfig]);
 
   const updateContextCompressionEnabled = useCallback(
     async (nextEnabled: boolean) => {
@@ -1569,7 +1576,7 @@ const ChatPage: React.FC = () => {
                   className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
+              {canEditGlobalConfig && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
                 <label
                   className={cn(
                     'inline-flex items-center gap-2 text-sm',
@@ -1595,8 +1602,8 @@ const ChatPage: React.FC = () => {
                       ? '已启用'
                       : '未启用'}
                 </span>
-              </div>
-              {contextCompressionError ? (
+              </div>}
+              {canEditGlobalConfig && contextCompressionError ? (
                 <InlineAlert
                   variant="danger"
                   title="上下文压缩设置未保存"

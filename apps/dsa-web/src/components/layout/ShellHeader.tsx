@@ -1,14 +1,13 @@
 import type React from 'react';
-import { Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
 import { UiLanguageToggle } from '../i18n/UiLanguageToggle';
 import { ThemeToggle } from '../theme/ThemeToggle';
+import { DesktopUpdateIndicator } from './DesktopUpdateIndicator';
 
 type ShellHeaderProps = {
-  collapsed: boolean;
-  onToggleSidebar: () => void;
   onOpenMobileNav: () => void;
 };
 
@@ -16,6 +15,7 @@ const TITLES: Record<string, { title: UiTextKey; description: UiTextKey }> = {
   '/': { title: 'layout.route.home.title', description: 'layout.route.home.description' },
   '/chat': { title: 'layout.route.chat.title', description: 'layout.route.chat.description' },
   '/portfolio': { title: 'layout.route.portfolio.title', description: 'layout.route.portfolio.description' },
+  '/decision-signals': { title: 'layout.nav.decisionSignals', description: 'layout.route.home.description' },
   '/screening': { title: 'layout.route.screening.title', description: 'layout.route.screening.description' },
   '/backtest': { title: 'layout.route.backtest.title', description: 'layout.route.backtest.description' },
   '/alerts': { title: 'layout.route.alerts.title', description: 'layout.route.alerts.description' },
@@ -24,8 +24,6 @@ const TITLES: Record<string, { title: UiTextKey; description: UiTextKey }> = {
 };
 
 export const ShellHeader: React.FC<ShellHeaderProps> = ({
-  collapsed,
-  onToggleSidebar,
   onOpenMobileNav,
 }) => {
   const location = useLocation();
@@ -33,31 +31,23 @@ export const ShellHeader: React.FC<ShellHeaderProps> = ({
   const current = TITLES[location.pathname];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/84 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 w-full max-w-[1680px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+    <header className="finance-header sticky top-0 z-30 border-b border-border bg-card">
+      <div className="flex h-[68px] w-full items-center gap-3 px-4 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={onOpenMobileNav}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/70 text-secondary-text transition-colors hover:bg-hover hover:text-foreground lg:hidden"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-secondary-text transition-colors hover:bg-hover hover:text-foreground lg:hidden"
           aria-label={t('layout.openNav')}
         >
           <Menu className="h-5 w-5" />
         </button>
 
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          className="hidden h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/70 text-secondary-text transition-colors hover:bg-hover hover:text-foreground lg:inline-flex"
-          aria-label={collapsed ? t('layout.expandSidebar') : t('layout.collapseSidebar')}
-        >
-          {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
-        </button>
-
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">{current ? t(current.title) : t('layout.appFallbackTitle')}</p>
-          <p className="truncate text-xs text-secondary-text">{current ? t(current.description) : t('layout.appFallbackDescription')}</p>
+          <p className="truncate text-[15px] font-semibold text-foreground">{current ? t(current.title) : t('layout.appFallbackTitle')}</p>
+          <p className="hidden truncate text-[11px] text-secondary-text sm:block">{current ? t(current.description) : t('layout.appFallbackDescription')}</p>
         </div>
 
+        <DesktopUpdateIndicator />
         <UiLanguageToggle />
         <ThemeToggle />
       </div>

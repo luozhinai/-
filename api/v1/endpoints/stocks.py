@@ -16,6 +16,7 @@ from typing import Optional
 import re
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, Depends
+from sqlalchemy import select
 
 from api.deps import get_system_config_service
 
@@ -44,6 +45,8 @@ from src.services.stock_profile_service import InvalidStockProfileCode, StockPro
 from src.services.run_diagnostics import sanitize_diagnostic_text
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
+from src import web_accounts
+from src.storage import DatabaseManager, WebWatchlistItem
 from data_provider.base import normalize_stock_code
 
 logger = logging.getLogger(__name__)
@@ -122,6 +125,52 @@ def _watchlist_match_key(code: str) -> str:
     if re.fullmatch(r"\d{5}", normalized):
         return f"HK{normalized}"
     return normalized.upper()
+
+
+def _personal_watchlist_user(request: Request | None) -> str | None:
+    """Only ordinary Web accounts use the private watchlist table."""
+    if not web_accounts.enabled():
+        return None
+    identity = getattr(request.state, "web_user", None) if request is not None else None
+    if identity is None:
+        raise HTTPException(status_code=401, detail={"error": "unauthorized", "message": "请先登录"})
+    if identity.role == "admin":
+        return None
+    if identity.role != "user":
+        raise HTTPException(status_code=403, detail={"error": "forbidden", "message": "账号无权访问自选股"})
+    return identity.id
+
+
+def _personal_watchlist_codes(user_id: str) -> list[str]:
+    with DatabaseManager.get_instance().session_scope() as session:
+        items = session.scalars(
+            select(WebWatchlistItem)
+            .where(WebWatchlistItem.user_id == user_id)
+            .order_by(WebWatchlistItem.id)
+        ).all()
+        return [item.code for item in items]
+
+
+def _change_personal_watchlist(user_id: str, code: str, *, remove: bool) -> list[str]:
+    match_key = _watchlist_match_key(code)
+    with DatabaseManager.get_instance().session_scope() as session:
+        item = session.scalar(
+            select(WebWatchlistItem).where(
+                WebWatchlistItem.user_id == user_id,
+                WebWatchlistItem.match_key == match_key,
+            )
+        )
+        if remove and item is not None:
+            session.delete(item)
+        elif not remove and item is None:
+            session.add(WebWatchlistItem(user_id=user_id, code=code, match_key=match_key))
+        session.flush()
+        items = session.scalars(
+            select(WebWatchlistItem)
+            .where(WebWatchlistItem.user_id == user_id)
+            .order_by(WebWatchlistItem.id)
+        ).all()
+        return [entry.code for entry in items]
 
 
 @router.post(
@@ -327,14 +376,18 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
         500: {"description": "服务器错误", "model": ErrorResponse},
     },
     summary="获取自选队列",
-    description="返回当前 STOCK_LIST 配置中的所有股票代码。",
+    description="账号模式下返回当前账号的自选股；管理员及旧模式使用 STOCK_LIST。",
 )
 def get_watchlist(
     service: SystemConfigService = Depends(get_system_config_service),
+    request: Request = None,
 ) -> WatchlistResponse:
     try:
-        codes = _read_watchlist_codes(service)
+        user_id = _personal_watchlist_user(request)
+        codes = _personal_watchlist_codes(user_id) if user_id else _read_watchlist_codes(service)
         return WatchlistResponse(stock_codes=codes, message=f"当前自选 {len(codes)} 只股票")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"获取自选队列失败: {e}", exc_info=True)
         raise HTTPException(
@@ -352,14 +405,19 @@ def get_watchlist(
         500: {"description": "服务器错误", "model": ErrorResponse},
     },
     summary="加入自选队列",
-    description="将指定股票代码加入 STOCK_LIST。",
+    description="账号模式下加入当前账号自选股；管理员及旧模式更新 STOCK_LIST。",
 )
 def add_to_watchlist(
     request: WatchlistRequest,
     service: SystemConfigService = Depends(get_system_config_service),
+    http_request: Request = None,
 ) -> WatchlistResponse:
     try:
         validated = _validate_and_normalize_stock_code(request.stock_code)
+        user_id = _personal_watchlist_user(http_request)
+        if user_id:
+            codes = _change_personal_watchlist(user_id, request.stock_code.strip(), remove=False)
+            return WatchlistResponse(stock_codes=codes, message=f"已加入 {request.stock_code.strip()}")
         codes = _read_watchlist_codes(service)
         existing_keys = [_watchlist_match_key(c) for c in codes]
         if _watchlist_match_key(validated) not in existing_keys:
@@ -385,14 +443,19 @@ def add_to_watchlist(
         500: {"description": "服务器错误", "model": ErrorResponse},
     },
     summary="从自选队列删除",
-    description="从 STOCK_LIST 中移除指定股票代码。",
+    description="账号模式下移除当前账号自选股；管理员及旧模式更新 STOCK_LIST。",
 )
 def remove_from_watchlist(
     request: WatchlistRequest,
     service: SystemConfigService = Depends(get_system_config_service),
+    http_request: Request = None,
 ) -> WatchlistResponse:
     try:
         validated = _validate_and_normalize_stock_code(request.stock_code)
+        user_id = _personal_watchlist_user(http_request)
+        if user_id:
+            codes = _change_personal_watchlist(user_id, request.stock_code.strip(), remove=True)
+            return WatchlistResponse(stock_codes=codes, message=f"已移除 {request.stock_code.strip()}")
         codes = _read_watchlist_codes(service)
         existing_keys = [_watchlist_match_key(c) for c in codes]
         requested_key = _watchlist_match_key(validated)

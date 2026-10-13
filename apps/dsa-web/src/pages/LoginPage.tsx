@@ -12,7 +12,7 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { SettingsAlert } from '../components/settings';
 
 const LoginPage: React.FC = () => {
-  const { login, passwordSet, setupState } = useAuth();
+  const { login, register, passwordSet, setupState, accountMode, adminExists, legacyPasswordRequired } = useAuth();
   const { t } = useUiLanguage();
   const navigate = useNavigate();
 
@@ -27,10 +27,18 @@ const LoginPage: React.FC = () => {
 
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [username, setUsername] = useState('');
+  const [legacyPassword, setLegacyPassword] = useState('');
+  const [mode, setMode] = useState<'login' | 'register'>(adminExists ? 'login' : 'register');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | ParsedApiError | null>(null);
 
-  const isFirstTime = setupState === 'no_password' || !passwordSet;
+  const isFirstTime = !accountMode && (setupState === 'no_password' || !passwordSet);
+  const isRegistering = accountMode && mode === 'register';
+  const registrationTitle = adminExists ? '创建普通账户' : '创建管理员账户';
+  const registrationDescription = adminExists
+    ? '创建普通账户后进入分析工作台。'
+    : '首次在服务器本机创建管理员账户。';
 
   // 3D Tilt effect values
   const mouseX = useMotionValue(0);
@@ -54,15 +62,17 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (isFirstTime && password !== passwordConfirm) {
+    if ((isFirstTime || isRegistering) && password !== passwordConfirm) {
       setError(t('login.passwordMismatch'));
       return;
     }
     setIsSubmitting(true);
     try {
-      const result = await login(password, isFirstTime ? passwordConfirm : undefined);
+      const result = isRegistering
+        ? await register(username, password, passwordConfirm, !adminExists && legacyPasswordRequired ? legacyPassword : undefined)
+        : await login(password, isFirstTime ? passwordConfirm : undefined, accountMode ? username : undefined);
       if (result.success) {
-        navigate(redirect, { replace: true });
+        navigate(isRegistering ? '/' : redirect, { replace: true });
       } else {
         setError(result.error ?? t('login.loginFailed'));
       }
@@ -138,7 +148,7 @@ const LoginPage: React.FC = () => {
             className="mt-6 flex items-center gap-2 rounded-full border border-[var(--login-accent-border)] bg-[var(--login-accent-soft)] px-3 py-1 text-[10px] font-medium text-[var(--login-accent-text)] backdrop-blur-sm"
           >
             <Network className="h-3 w-3" />
-            <span>V3.X QUANTITATIVE SYSTEM</span>
+          <span>金融分析的实力辅助</span>
           </motion.div>
         </motion.div>
 
@@ -158,56 +168,100 @@ const LoginPage: React.FC = () => {
 
             <div className="mb-8">
               <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--login-text-primary)]">
-                {isFirstTime ? (
+                {isFirstTime || isRegistering ? (
                   <>
                     <ShieldCheck className="h-6 w-6 text-emerald-400" />
-                    <span>{t('login.setupTitle')}</span>
+                    <span>{accountMode ? registrationTitle : t('login.setupTitle')}</span>
                   </>
                 ) : (
                   <>
                     <Lock className="h-5 w-5 text-[var(--login-accent-text)]" />
-                    <span>{t('login.adminLogin')}</span>
+                    <span>{accountMode ? '登录账号' : t('login.adminLogin')}</span>
                   </>
                 )}
               </h1>
               <p className="mt-2 text-sm text-[var(--login-text-secondary)]">
-                {isFirstTime
-                  ? t('login.setupDescription')
-                  : t('login.loginDescription')}
+                {accountMode
+                  ? isRegistering ? registrationDescription : '登录后进入分析工作台。'
+                  : isFirstTime ? t('login.setupDescription') : t('login.loginDescription')}
               </p>
             </div>
 
+            {accountMode && (
+              <div className="mb-6 grid grid-cols-2 rounded-xl border border-[var(--login-border-card)] bg-[var(--login-accent-soft)] p-1" role="tablist" aria-label="账号操作">
+                <button type="button" role="tab" aria-selected={!isRegistering} className={`rounded-lg px-4 py-2 text-sm transition ${!isRegistering ? 'bg-[var(--login-bg-card)] font-semibold text-[var(--login-text-primary)] shadow-sm' : 'text-[var(--login-text-secondary)]'}`} onClick={() => { setMode('login'); setError(null); }}>登录</button>
+                <button type="button" role="tab" aria-selected={isRegistering} className={`rounded-lg px-4 py-2 text-sm transition ${isRegistering ? 'bg-[var(--login-bg-card)] font-semibold text-[var(--login-text-primary)] shadow-sm' : 'text-[var(--login-text-secondary)]'}`} onClick={() => { setMode('register'); setError(null); }}>注册</button>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-4">
+                {accountMode && (
+                  <Input
+                    id="username"
+                    appearance="login"
+                    label="用户名"
+                    placeholder="英文字母、数字或下划线"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    disabled={isSubmitting}
+                    autoComplete="username"
+                    required
+                    minLength={3}
+                    maxLength={32}
+                    autoFocus
+                  />
+                )}
                 <Input
                   id="password"
                   type="password"
                   appearance="login"
                   allowTogglePassword
                   iconType="password"
-                  label={isFirstTime ? t('login.adminPassword') : t('login.loginPassword')}
+                  label={accountMode ? '密码' : isFirstTime ? t('login.adminPassword') : t('login.loginPassword')}
                   placeholder={isFirstTime ? t('login.setupPasswordPlaceholder') : t('login.loginPasswordPlaceholder')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isSubmitting}
-                  autoFocus
-                  autoComplete={isFirstTime ? 'new-password' : 'current-password'}
+                  autoFocus={!accountMode}
+                  autoComplete={isFirstTime || isRegistering ? 'new-password' : 'current-password'}
+                  required={accountMode}
+                  minLength={accountMode ? 8 : undefined}
                 />
 
-                {isFirstTime && (
+                {(isFirstTime || isRegistering) && (
                   <Input
                     id="passwordConfirm"
                     type="password"
                     appearance="login"
                     allowTogglePassword
                     iconType="password"
-                    label={t('login.confirmPassword')}
+                    label={accountMode ? '确认密码' : t('login.confirmPassword')}
                     placeholder={t('login.confirmPasswordPlaceholder')}
                     value={passwordConfirm}
                     onChange={(e) => setPasswordConfirm(e.target.value)}
                     disabled={isSubmitting}
                     autoComplete="new-password"
                   />
+                )}
+                {isRegistering && !adminExists && legacyPasswordRequired && (
+                  <Input
+                    id="legacyPassword"
+                    type="password"
+                    appearance="login"
+                    allowTogglePassword
+                    iconType="key"
+                    label="原管理员密码"
+                    placeholder="用于接收现有数据"
+                    value={legacyPassword}
+                    onChange={(e) => setLegacyPassword(e.target.value)}
+                    disabled={isSubmitting}
+                    autoComplete="current-password"
+                    required
+                  />
+                )}
+                {isRegistering && !adminExists && (
+                  <p className="text-xs leading-5 text-[var(--login-text-secondary)]">首个管理员账号需在服务器本机注册。原有报告、自选股和设置将由管理员使用。</p>
                 )}
               </div>
 
@@ -218,7 +272,7 @@ const LoginPage: React.FC = () => {
                   className="overflow-hidden"
                 >
                   <SettingsAlert
-                    title={isFirstTime ? t('login.setupFailed') : t('login.validationFailed')}
+                    title={isFirstTime || isRegistering ? t('login.setupFailed') : t('login.validationFailed')}
                     message={isParsedApiError(error) ? error.message : error}
                     variant="error"
                     className="!border-[var(--login-error-border)] !bg-[var(--login-error-bg)] !text-[var(--login-error-text)]"
@@ -237,10 +291,10 @@ const LoginPage: React.FC = () => {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>{isFirstTime ? t('login.setupSubmitting') : t('login.loginSubmitting')}</span>
+                      <span>{isRegistering ? '正在创建账户…' : isFirstTime ? t('login.setupSubmitting') : t('login.loginSubmitting')}</span>
                     </>
                   ) : (
-                    <span>{isFirstTime ? t('login.setupSubmit') : t('login.loginSubmit')}</span>
+                    <span>{isRegistering ? registrationTitle : accountMode ? '登录' : isFirstTime ? t('login.setupSubmit') : t('login.loginSubmit')}</span>
                   )}
                 </div>
                 <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
+import { BarChart3, Check, History, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi, DuplicateTaskError } from '../api/analysis';
@@ -292,7 +292,7 @@ const HomePage: React.FC = () => {
   const [marketReviewError, setMarketReviewError] = useState<ParsedApiError | null>(null);
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
   const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
-  const [marketReviewRegionOverride, setMarketReviewRegionOverride] = useState<MarketReviewRegion[] | undefined>();
+  const [marketReviewRegionOverride, setMarketReviewRegionOverride] = useState<MarketReviewRegion[] | undefined>(['us']);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -1516,10 +1516,10 @@ const HomePage: React.FC = () => {
   return (
     <div
       data-testid="home-dashboard"
-      className="flex h-[calc(100vh-5rem)] w-full flex-col overflow-hidden md:flex-row sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
+      className="finance-home flex h-[calc(100vh-68px)] w-full flex-col overflow-hidden md:flex-row"
     >
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full lg:max-w-6xl mx-auto w-full">
-        <header className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full mx-auto w-full">
+        <header className="finance-home-toolbar relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-4 py-4 md:px-6 lg:px-8">
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <button
@@ -1527,9 +1527,7 @@ const HomePage: React.FC = () => {
                 className="md:hidden -ml-1 flex-shrink-0 rounded-lg p-1.5 text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
                 aria-label={t('home.historyButton')}
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+                <History className="h-5 w-5" aria-hidden="true" />
               </button>
               <div className="relative min-w-0 flex-1">
                 <StockAutocomplete
@@ -1703,7 +1701,7 @@ const HomePage: React.FC = () => {
         ) : null}
 
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden pl-4 pb-4 md:flex lg:w-72">
+          <div className="finance-home-history hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden pl-4 pb-4 md:flex lg:w-72">
             {sidebarContent}
           </div>
 
@@ -1722,7 +1720,7 @@ const HomePage: React.FC = () => {
           <section
             ref={dashboardScrollRef}
             data-testid="home-dashboard-scroll"
-            className="flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto px-3 pb-4 md:px-6 touch-pan-y"
+            className="finance-home-report flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto px-4 pb-4 md:px-6 lg:px-8 touch-pan-y"
           >
             {marketReviewNotice ? (
               <div className="mb-3">

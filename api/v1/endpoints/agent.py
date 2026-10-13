@@ -10,7 +10,7 @@ import threading
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -19,6 +19,7 @@ from api.v1.schemas.system_config import AgentBackendStatusResponse
 from src.config import get_config
 from src.services.agent_chat_session_service import AgentChatSessionService
 from src.services.agent_model_service import list_agent_model_deployments
+from src import web_accounts
 
 # Tool name -> Chinese display name mapping
 TOOL_DISPLAY_NAMES: Dict[str, str] = {
@@ -46,6 +47,29 @@ router = APIRouter()
 
 _ACTIVE_CODEX_STREAMS: Dict[str, threading.Event] = {}
 _ACTIVE_CODEX_STREAMS_LOCK = threading.Lock()
+
+
+def _account_session_id(request: Request | None, session_id: str | None) -> str:
+    """Namespace ordinary Web account conversations before they reach storage."""
+    raw = (session_id or str(uuid.uuid4())).strip()
+    if not web_accounts.enabled() or request is None:
+        return raw
+    identity = getattr(request.state, "web_user", None)
+    if identity is None or identity.role == "admin":
+        return raw
+    prefix = f"web_{identity.id}:"
+    if raw.startswith("web_") and not raw.startswith(prefix):
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return raw if raw.startswith(prefix) else f"{prefix}{raw}"
+
+
+def _external_session_id(request: Request | None, session_id: str) -> str:
+    if not web_accounts.enabled() or request is None:
+        return session_id
+    identity = getattr(request.state, "web_user", None)
+    if identity is None or identity.role == "admin":
+        return session_id
+    return session_id.removeprefix(f"web_{identity.id}:")
 
 class ChatRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -197,6 +221,7 @@ async def get_strategies():
 @router.post("/chat", response_model=ChatResponse)
 async def agent_chat(
     request: ChatRequest,
+    http_request: Request,
     session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
 ):
     """
@@ -217,7 +242,7 @@ async def agent_chat(
             },
         )
     
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = _account_session_id(http_request, request.session_id)
     
     try:
         skill_selection = session_service.resolve_skill_selection(
@@ -242,7 +267,7 @@ async def agent_chat(
         return ChatResponse(
             success=result.success,
             content=result.content,
-            session_id=session_id,
+            session_id=_external_session_id(http_request, session_id),
             error=result.error,
         )
             
@@ -273,6 +298,7 @@ class SessionMessagesResponse(BaseModel):
 
 @router.get("/chat/sessions", response_model=SessionsResponse)
 async def list_chat_sessions(
+    request: Request,
     limit: int = 50,
     user_id: Optional[str] = None,
     session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
@@ -287,23 +313,30 @@ async def list_chat_sessions(
             include the platform prefix, e.g. ``telegram_12345``,
             ``feishu_ou_abc``.
     """
-    sessions = session_service.list_sessions(limit, user_id)
+    scoped_user_id = user_id
+    identity = getattr(request.state, "web_user", None)
+    if web_accounts.enabled() and identity is not None and identity.role != "admin":
+        scoped_user_id = f"web_{identity.id}"
+    sessions = session_service.list_sessions(limit, scoped_user_id)
+    sessions = [{**item, "session_id": _external_session_id(request, item["session_id"])} for item in sessions]
     return SessionsResponse(sessions=sessions)
 
 
 @router.get("/chat/sessions/{session_id}", response_model=SessionMessagesResponse)
 async def get_chat_session_messages(
     session_id: str,
+    request: Request,
     limit: int = 100,
     session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
 ):
     """获取单个会话的完整消息"""
+    effective_session_id = _account_session_id(request, session_id)
     detail = session_service.get_session_detail(
-        session_id,
+        effective_session_id,
         limit,
     )
     return SessionMessagesResponse(
-        session_id=session_id,
+        session_id=_external_session_id(request, effective_session_id),
         messages=detail.messages,
         session_state=SessionStateResponse(
             selected_skill_ids=detail.selected_skill_ids,
@@ -314,10 +347,11 @@ async def get_chat_session_messages(
 @router.delete("/chat/sessions/{session_id}")
 async def delete_chat_session(
     session_id: str,
+    request: Request,
     session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
 ):
     """删除指定会话"""
-    count = session_service.delete_session(session_id)
+    count = session_service.delete_session(_account_session_id(request, session_id))
     return {"deleted": count}
 
 
@@ -476,6 +510,7 @@ async def agent_research(request: ResearchRequest):
 @router.post("/chat/stream")
 async def agent_chat_stream(
     request: ChatRequest,
+    http_request: Request,
     session_service: AgentChatSessionService = Depends(get_agent_chat_session_service),
 ):
     """
@@ -496,7 +531,7 @@ async def agent_chat_stream(
     config = get_config()
     backend_id = _select_agent_chat_backend(config)
 
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = _account_session_id(http_request, request.session_id)
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
     cancel_event = threading.Event()
@@ -548,7 +583,7 @@ async def agent_chat_stream(
                 "content": result.content,
                 "error": result.error,
                 "total_steps": result.total_steps,
-                "session_id": session_id,
+                "session_id": _external_session_id(http_request, session_id),
             }
             event.update({
                 "backend": getattr(result, "backend", "") or backend_id,
@@ -597,7 +632,7 @@ async def agent_chat_stream(
                 "type": "accepted",
                 "backend": backend_id,
                 "request_id": request_id,
-                "session_id": session_id,
+                "session_id": _external_session_id(http_request, session_id),
             }
             yield "data: " + json.dumps(accepted_event, ensure_ascii=False) + "\n\n"
 

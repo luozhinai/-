@@ -72,7 +72,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
   }, [open]);
 
   const activeTheme = (theme as ThemeOption | undefined) ?? 'system';
-  const visualTheme = resolvedTheme ?? 'dark';
+  const visualTheme = resolvedTheme ?? 'light';
   const TriggerIcon = visualTheme === 'light' ? Sun : Moon;
   const isNavVariant = variant === 'nav';
   const isRailVariant = variant === 'rail';

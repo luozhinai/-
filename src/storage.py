@@ -97,6 +97,72 @@ class DatabaseSchemaMigration(Base):
     applied_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
 
 
+class WebUser(Base):
+    """Web identity. Legacy business rows stay untouched until tenant migration."""
+
+    __tablename__ = 'web_users'
+
+    id = Column(String(32), primary_key=True)
+    username = Column(String(64), nullable=False, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(16), nullable=False, default='user')
+    session_version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+
+
+class WebWatchlistItem(Base):
+    """One account's watchlist entry; legacy STOCK_LIST belongs to the admin."""
+
+    __tablename__ = 'web_watchlist_items'
+    __table_args__ = (UniqueConstraint('user_id', 'match_key', name='uq_web_watchlist_user_code'),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(32), ForeignKey('web_users.id'), nullable=False, index=True)
+    code = Column(String(32), nullable=False)
+    match_key = Column(String(32), nullable=False)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+
+
+class WebNotificationChannel(Base):
+    """A private notification destination configured by one Web account."""
+
+    __tablename__ = 'web_notification_channels'
+    __table_args__ = (UniqueConstraint('user_id', 'channel', name='uq_web_notification_user_channel'),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(32), ForeignKey('web_users.id'), nullable=False, index=True)
+    channel = Column(String(16), nullable=False)
+    label = Column(String(80), nullable=False, default='')
+    destination_encrypted = Column(Text, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+
+
+class WebScheduledPushTask(Base):
+    """One account-owned scheduled analysis/news notification task."""
+
+    __tablename__ = 'web_scheduled_push_tasks'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(32), ForeignKey('web_users.id'), nullable=False, index=True)
+    name = Column(String(80), nullable=False)
+    schedule_time = Column(String(5), nullable=False)
+    stock_codes_json = Column(Text, nullable=False, default='[]')
+    channel = Column(String(16), nullable=False)
+    destination_encrypted = Column(Text, nullable=False)
+    include_ai_analysis = Column(Boolean, nullable=False, default=True)
+    include_news_summary = Column(Boolean, nullable=False, default=False)
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    last_run_at = Column(DateTime, index=True)
+    last_error = Column(Text)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'name', name='uq_web_scheduled_push_user_name'),
+    )
+
+
 class StockDaily(Base):
     """
     股票日线数据模型

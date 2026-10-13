@@ -13,18 +13,40 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.auth import COOKIE_NAME, is_auth_enabled, verify_session
+from src import web_accounts
 
 logger = logging.getLogger(__name__)
 
 EXEMPT_PATHS = frozenset({
     "/api/v1/auth/login",
     "/api/v1/auth/status",
+    "/api/v1/auth/register",
     "/api/health",
     "/api/v1/health",
     "/health",
     "/docs",
     "/redoc",
     "/openapi.json",
+})
+
+PERSONAL_ACCOUNT_PATHS = frozenset({
+    "/api/v1/stocks/watchlist",
+    "/api/v1/stocks/watchlist/add",
+    "/api/v1/stocks/watchlist/remove",
+})
+PERSONAL_ACCOUNT_PREFIXES = ("/api/v1/personal/notifications",)
+
+# System configuration contains model keys, search keys, SMTP credentials and
+# global scheduler controls. In account mode it is the only Web area that is
+# administrator-only; ordinary accounts use the same workbench APIs as the
+# administrator and receive their own data through the endpoint ownership
+# checks as they are added.
+ADMIN_ONLY_PREFIXES = (
+    "/api/v1/system/config",
+    "/api/v1/system/scheduler",
+)
+PUBLIC_SYSTEM_READ_PATHS = frozenset({
+    "/api/v1/system/config/setup/status",
 })
 
 
@@ -42,6 +64,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: Callable,
     ):
+        if web_accounts.enabled():
+            path = request.url.path
+            if _path_exempt(path) or path == "/api/v1/auth/logout" or not path.startswith("/api/v1/"):
+                return await call_next(request)
+            identity = web_accounts.verify_session(request.cookies.get(web_accounts.COOKIE_NAME))
+            if identity is None:
+                return JSONResponse(status_code=401, content={"error": "unauthorized", "message": "请先登录"})
+            request.state.web_user = identity
+            if identity.role != "admin":
+                is_admin_only = any(path == prefix or path.startswith(prefix + "/") for prefix in ADMIN_ONLY_PREFIXES)
+                if is_admin_only and path not in PUBLIC_SYSTEM_READ_PATHS:
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "error": "admin_required",
+                            "message": "只有管理员可以查看或修改系统设置",
+                        },
+                    )
+            return await call_next(request)
+
         if not is_auth_enabled():
             return await call_next(request)
 

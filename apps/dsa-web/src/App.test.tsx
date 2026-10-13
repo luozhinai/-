@@ -31,6 +31,10 @@ vi.mock('./pages/HomePage', () => ({
   default: () => <div data-testid="home-page">Home</div>,
 }));
 
+vi.mock('./pages/PersonalSettingsPage', () => ({
+  default: () => <div data-testid="personal-settings-page">Personal settings</div>,
+}));
+
 vi.mock('./pages/ChatPage', () => ({
   default: () => {
     if (chatPageShouldThrow.value) {
@@ -79,9 +83,14 @@ function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
     passwordSet: false,
     passwordChangeable: false,
     setupState: 'no_password',
+    accountMode: false,
+    adminExists: false,
+    legacyPasswordRequired: false,
+    user: null,
     isLoading: false,
     loadError: null,
     login: vi.fn().mockResolvedValue({ success: true }),
+    register: vi.fn().mockResolvedValue({ success: true }),
     changePassword: vi.fn().mockResolvedValue({ success: true }),
     logout: vi.fn().mockResolvedValue(undefined),
     refreshStatus: vi.fn().mockResolvedValue(undefined),
@@ -164,6 +173,46 @@ describe('App routing behavior', () => {
 
     expect(await screen.findByTestId('home-page')).toBeInTheDocument();
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+  });
+
+  it('opens the same workbench routes for an ordinary account', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      accountMode: true,
+      user: { id: 'reader', username: 'reader', role: 'user' },
+    }));
+    window.history.pushState({}, '', '/portfolio');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('portfolio-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/portfolio');
+    expect(screen.getByRole('navigation', { name: '主导航' })).toBeInTheDocument();
+  });
+
+  it('keeps an ordinary account on the common homepage after login', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      accountMode: true,
+      user: { id: 'reader', username: 'reader', role: 'user' },
+    }));
+    render(<App />);
+    expect(await screen.findByTestId('home-page')).toBeInTheDocument();
+  });
+
+  it('shows personal settings instead of administrator settings for an ordinary account', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      accountMode: true,
+      user: { id: 'reader', username: 'reader', role: 'user' },
+    }));
+    window.history.pushState({}, '', '/settings');
+    render(<App />);
+    expect(await screen.findByTestId('personal-settings-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-page')).not.toBeInTheDocument();
   });
 
   it('keeps the shell mounted and resets the route boundary after page render errors', async () => {
